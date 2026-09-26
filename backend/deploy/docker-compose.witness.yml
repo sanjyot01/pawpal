@@ -1,0 +1,30 @@
+# WITNESS (t3.nano) — quorum only, no workload.
+#
+#   docker compose --env-file .env -f docker-compose.witness.yml up -d
+#
+# Why a third box that serves no traffic: with only two Sentinels, a network
+# partition leaves each side seeing one vote and neither able to reach a majority,
+# so either nothing fails over or both sides promote themselves (split brain).
+# A third vote on an independent instance makes "which side is the real majority"
+# answerable. It runs no app, no broker and no data — hence the smallest instance
+# type. This is the cheapest honest answer to HA on a two-node budget.
+
+services:
+  sentinel:
+    image: redis:7-alpine
+    container_name: pawpal-sentinel-witness
+    network_mode: host
+    command:
+      - sh
+      - -c
+      - |
+        cat > /tmp/sentinel.conf <<EOF
+        port 26379
+        sentinel monitor ${REDIS_MASTER_NAME} ${NODE_B_IP} 6379 2
+        sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 5000
+        sentinel failover-timeout ${REDIS_MASTER_NAME} 10000
+        sentinel parallel-syncs ${REDIS_MASTER_NAME} 1
+        sentinel announce-ip ${WITNESS_IP}
+        EOF
+        exec redis-sentinel /tmp/sentinel.conf
+    restart: unless-stopped

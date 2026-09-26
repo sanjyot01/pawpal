@@ -1,0 +1,426 @@
+{
+  "uid": "pawpal-backend",
+  "title": "PawPal Backend",
+  "tags": ["pawpal"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "id": 100,
+      "title": "Service",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "id": 1,
+      "title": "Registered users",
+      "description": "matching.users.total — a gauge backed by select count(*) from users.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        { "refId": "A", "expr": "matching_users_total", "legendFormat": "users" }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 2,
+      "title": "Users in geo index",
+      "description": "Members of the Redis users:geo set. Zero here means the map and the partner feeds will be empty no matter how many rows Postgres holds — telemetry is what puts a user on the map.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        { "refId": "A", "expr": "matching_users_in_geo", "legendFormat": "in geo" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 3,
+      "title": "Request rate by status",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(http_server_requests_seconds_count[1m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 4,
+      "title": "HTTP latency p95 by endpoint",
+      "description": "Top 5 slowest routes. Watch this while the login limiter is being exercised — a saturated thread pool shows up here first.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(5, histogram_quantile(0.95, sum by (uri, le) (rate(http_server_requests_seconds_bucket[5m]))))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 101,
+      "title": "Matching",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 5,
+      "title": "Match outcomes",
+      "description": "A flat 'success' line with a rising 'no match' line usually means presence expired (users:presence:* has a 6h TTL) rather than a matching bug.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 7 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 15 } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "no match" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "matched" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "rate(matching_match_success_total[1m])", "legendFormat": "matched" },
+        { "refId": "B", "expr": "rate(matching_match_failed_total[1m])", "legendFormat": "no match" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 6,
+      "title": "Match resolution time",
+      "description": "matching.duration — the full radius-expansion search (2km, then 5km, then 10km) including the pipelined metadata reads.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 7 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "matching_duration_seconds{quantile=\"0.5\"}",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "matching_duration_seconds{quantile=\"0.95\"}",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "matching_duration_seconds{quantile=\"0.99\"}",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 7,
+      "title": "Match success rate",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.3 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(matching_match_success_total[15m])) / clamp_min(sum(increase(matching_match_success_total[15m])) + sum(increase(matching_match_failed_total[15m])), 1)",
+          "legendFormat": "success rate"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 102,
+      "title": "Telemetry pipeline",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 8,
+      "title": "Telemetry processed",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 15 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "rate(matching_telemetry_processed_total[1m])", "legendFormat": "records/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 9,
+      "title": "Kafka batch size",
+      "description": "Records handed to the batch listener per poll. Small, uneven batches are the throughput-oscillation signature from THROUGHPUT_OPTIMIZATION_2026-06-16.md — the Redis pipeline stops amortizing.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 15 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "telemetry_kafka_batch_size{quantile=\"0.5\"}", "legendFormat": "p50" },
+        { "refId": "B", "expr": "telemetry_kafka_batch_size{quantile=\"0.95\"}", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 10,
+      "title": "Redis pipeline duration",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 15 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "telemetry_redis_pipeline_duration_seconds{quantile=\"0.95\"}", "legendFormat": "pipeline p95" },
+        { "refId": "B", "expr": "telemetry_processing_duration_seconds{quantile=\"0.95\"}", "legendFormat": "processing p95" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 11,
+      "title": "Consumer parallelism",
+      "description": "Distinct listener threads that have actually processed a message, against the threads blocked inside the Redis pipeline. Threads pegged in-flight means connection contention, not throughput.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 15 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "telemetry_kafka_consumer_distinct_threads", "legendFormat": "distinct threads" },
+        { "refId": "B", "expr": "telemetry_redis_pipeline_inflight", "legendFormat": "pipeline in-flight" }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 103,
+      "title": "Auth and errors",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 12,
+      "title": "Rate-limited auth attempts",
+      "description": "auth.ratelimit.blocked — 429s from the login limiter. The 'ip' series is the CPU-exhaustion defence; a spike on 'account' with a flat 'ip' series is a password spray spread across addresses.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 23 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (scope) (rate(auth_ratelimit_blocked_total[1m]))",
+          "legendFormat": "{{scope}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 13,
+      "title": "Login attempts by status",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 23 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{uri=~\"/api/auth/.*|/api/users/login|/api/users/register\"}[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 14,
+      "title": "Application errors",
+      "description": "errors.count from GlobalExceptionHandler, split by HTTP status. 4xx is callers getting it wrong; 5xx is us.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 23 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(errors_count_total[1m]))",
+          "legendFormat": "{{status}}"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(telemetry_consume_parse_errors_total[1m])",
+          "legendFormat": "telemetry parse errors"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(telemetry_consume_batch_errors_total[1m])",
+          "legendFormat": "telemetry batch errors"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 104,
+      "title": "Runtime",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 15,
+      "title": "JVM heap",
+      "description": "The app is pinned to -Xmx2g and shares a t3.large with Kafka, Postgres and Redis. Heap creeping toward the ceiling here is the first sign the box is undersized.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 31 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "used" },
+        { "refId": "B", "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "max" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 16,
+      "title": "Hikari connection pool",
+      "description": "Pool is 20 connections and Tomcat is capped at 50 threads to stay within reach of it. Pending above zero means requests are queueing on the database.",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 31 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_active", "legendFormat": "active" },
+        { "refId": "B", "expr": "hikaricp_connections_idle", "legendFormat": "idle" },
+        { "refId": "C", "expr": "hikaricp_connections_pending", "legendFormat": "pending" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 17,
+      "title": "Tomcat threads",
+      "datasource": { "type": "prometheus", "uid": "pawpal-prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 31 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "targets": [
+        { "refId": "A", "expr": "tomcat_threads_busy_threads", "legendFormat": "busy" },
+        { "refId": "B", "expr": "tomcat_threads_current_threads", "legendFormat": "current" },
+        { "refId": "C", "expr": "tomcat_threads_config_max_threads", "legendFormat": "max" }
+      ]
+    }
+  ]
+}

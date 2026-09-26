@@ -1,0 +1,89 @@
+# NODE B (Redis primary + app instance)
+#
+# Deliberately does NOT run the Kafka broker: the broker's disk I/O and the Redis
+# primary's write path are the two hottest things in the system, and co-locating
+# them makes each the other's noisy neighbour. Node A carries Kafka.
+#
+#   docker compose --env-file .env -f docker-compose.node-b.yml up -d
+#
+# Bring this node up FIRST — node A's Redis replica needs a primary to attach to.
+
+services:
+  # --------------------------------------------------------------------------
+  # Redis primary. All telemetry writes land here; replicas are for failover,
+  # not write capacity (one primary is the write ceiling for the whole cluster).
+  # --------------------------------------------------------------------------
+  redis-primary:
+    image: redis/redis-stack-server:latest
+    container_name: pawpal-redis-primary
+    # Host networking so replication and Sentinel work across instances without
+    # NAT rewriting the addresses Redis advertises to its peers.
+    network_mode: host
+    command: >
+      redis-server
+      --port 6379
+      --replica-announce-ip ${NODE_B_IP}
+      --appendonly yes
+      --save 900 1
+      --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Sentinel #1 of 3. Quorum is 2, so a single node failing cannot elect itself.
+  # --------------------------------------------------------------------------
+  sentinel:
+    image: redis:7-alpine
+    container_name: pawpal-sentinel-b
+    network_mode: host
+    depends_on:
+      - redis-primary
+    # Sentinel rewrites its own config at runtime, so it is generated on start
+    # rather than bind-mounted read-only.
+    command:
+      - sh
+      - -c
+      - |
+        cat > /tmp/sentinel.conf <<EOF
+        port 26379
+        sentinel monitor ${REDIS_MASTER_NAME} ${NODE_B_IP} 6379 2
+        sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 5000
+        sentinel failover-timeout ${REDIS_MASTER_NAME} 10000
+        sentinel parallel-syncs ${REDIS_MASTER_NAME} 1
+        sentinel announce-ip ${NODE_B_IP}
+        EOF
+        exec redis-sentinel /tmp/sentinel.conf
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # App instance. Identical image and config to node A's — the ALB treats them
+  # as interchangeable, which only works because auth is stateless (JWT).
+  # --------------------------------------------------------------------------
+  app:
+    image: ${APP_IMAGE}
+    container_name: pawpal-app-b
+    ports:
+      - "8080:8080" # reachable only from the ALB security group
+    environment:
+      DB_URL: jdbc:postgresql://${RDS_ENDPOINT}:5432/pet_social_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # Sentinel-aware client: survives a primary failover without a redeploy.
+      # Spring binds these to spring.data.redis.sentinel.* by relaxed binding.
+      SPRING_DATA_REDIS_SENTINEL_MASTER: ${REDIS_MASTER_NAME}
+      SPRING_DATA_REDIS_SENTINEL_NODES: ${NODE_A_IP}:26379,${NODE_B_IP}:26379,${WITNESS_IP}:26379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${NODE_A_IP}:9092
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS}
+      APP_TEST_ENDPOINTS_ENABLED: "false"
+      MGMT_ENDPOINTS: health,info,prometheus
+      MGMT_PROMETHEUS_ENABLED: "true"
+      # Only one instance may run migrations; node A owns that (see node-a compose).
+      FLYWAY_ENABLED: "false"
+    depends_on:
+      - redis-primary
+    restart: unless-stopped
+
+volumes:
+  redis_data:

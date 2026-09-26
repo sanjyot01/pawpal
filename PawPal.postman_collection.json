@@ -1,0 +1,1046 @@
+{
+  "info": {
+    "name": "PawPal API — E2E Test Suite",
+    "description": "End-to-end test of the PawPal backend, matching API_REFERENCE.md.\n\nHow to use:\n1. Start the stack: `docker compose up -d` then `.\\mvnw.cmd spring-boot:run` in backend/\n2. Import this file into Postman\n3. Click the collection → Run → keep the default order → Run PawPal API\n\nEvery request has assertions; a full run should be all green. Requests that intentionally provoke errors (401/400/409) assert those codes, so they pass when the API correctly rejects them.\n\nEach run registers fresh users (timestamped emails), so you can re-run without cleanup. Tokens and IDs are captured automatically into collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "aliceEmail", "value": "" },
+    { "key": "bobEmail", "value": "" },
+    { "key": "aliceToken", "value": "" },
+    { "key": "bobToken", "value": "" },
+    { "key": "aliceId", "value": "" },
+    { "key": "bobId", "value": "" },
+    { "key": "buddyId", "value": "" },
+    { "key": "lunaId", "value": "" },
+    { "key": "invitationId", "value": "" },
+    { "key": "matchId", "value": "" },
+    { "key": "itemId", "value": "" },
+    { "key": "invDateTime", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Health",
+      "item": [
+        {
+          "name": "Backend is up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('backend responds 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/system/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Auth",
+      "item": [
+        {
+          "name": "Register Alice",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('aliceEmail', `alice_${Date.now()}@test.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with token/userId/name/email', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.keys('token','userId','name','email','role');",
+                  "  pm.collectionVariables.set('aliceToken', j.token);",
+                  "  pm.collectionVariables.set('aliceId', j.userId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice\",\n  \"email\": \"{{aliceEmail}}\",\n  \"password\": \"secret1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Bob",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('bobEmail', `bob_${Date.now()}@test.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with token', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.collectionVariables.set('bobToken', j.token);",
+                  "  pm.collectionVariables.set('bobId', j.userId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob\",\n  \"email\": \"{{bobEmail}}\",\n  \"password\": \"secret1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Login Alice (valid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and BCrypt login works', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().token).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{aliceEmail}}\",\n  \"password\": \"secret1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Login wrong password → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 rejected', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{aliceEmail}}\",\n  \"password\": \"wrong\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Register short password → 400 validation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 with readable message', () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().message).to.include('at least 6');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"X\",\n  \"email\": \"shortpw_{{$timestamp}}@test.com\",\n  \"password\": \"ab\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Pets & discovery",
+      "item": [
+        {
+          "name": "Create Buddy (Alice's dog)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with formatted profile', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.species).to.eql('Dog');",
+                  "  pm.expect(j.tags).to.include('Vaccinated');",
+                  "  pm.collectionVariables.set('buddyId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ownerId\": {{aliceId}},\n  \"name\": \"Buddy\",\n  \"species\": \"DOG\",\n  \"breed\": \"Golden Retriever\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2024-03-01\",\n  \"personalityTags\": [\"Friendly\"],\n  \"vaccinated\": true,\n  \"preferredWalkTime\": \"7:00 AM\"\n}"
+            },
+            "url": "{{baseUrl}}/api/pets"
+          }
+        },
+        {
+          "name": "Create Luna (Bob's cat)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.collectionVariables.set('lunaId', pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ownerId\": {{bobId}},\n  \"name\": \"Luna\",\n  \"species\": \"CAT\",\n  \"breed\": \"Persian\",\n  \"gender\": \"FEMALE\",\n  \"vaccinated\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/pets"
+          }
+        },
+        {
+          "name": "Walking partners (as Bob) — sees Buddy, not Luna",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Buddy listed, own pet excluded', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const names = pm.response.json().map(p => p.name);",
+                  "  pm.expect(names).to.include('Buddy');",
+                  "  pm.expect(names).to.not.include('Luna');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/pets/partners?userId={{bobId}}"
+          }
+        },
+        {
+          "name": "Blind-date deck (as Bob)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('BlindDatePet shape', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const buddy = pm.response.json().find(p => p.name === 'Buddy');",
+                  "  pm.expect(buddy).to.exist;",
+                  "  pm.expect(buddy.vaccinated).to.eql(true);",
+                  "  pm.expect(buddy.gender).to.eql('Male');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/pets/blind-dates?userId={{bobId}}"
+          }
+        },
+        {
+          "name": "Report Alice's location (telemetry)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 accepted into Kafka', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{aliceId}},\n  \"latitude\": 43.651,\n  \"longitude\": -79.381\n}"
+            },
+            "url": "{{baseUrl}}/api/telemetry/location"
+          }
+        },
+        {
+          "name": "Nearby pets on the map",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Location flows through Kafka → Redis; give the consumer a moment",
+                  "await new Promise(resolve => setTimeout(resolve, 2500));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Buddy appears as a map pin', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const buddy = pm.response.json().find(p => p.name === 'Buddy');",
+                  "  pm.expect(buddy, 'pin for Buddy (if missing, re-send telemetry and retry)').to.exist;",
+                  "  pm.expect(buddy.latitude).to.be.closeTo(43.651, 0.01);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/pets/nearby?lat=43.65&lon=-79.38&radiusKm=5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Walk invitations",
+      "item": [
+        {
+          "name": "Alice posts an invitation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + 7 * 24 * 3600 * 1000);",
+                  "pm.collectionVariables.set('invDateTime', d.toISOString().slice(0, 19));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invitation shape with formatted date', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.totalSpots).to.eql(4);",
+                  "  pm.expect(j.spotsLeft).to.eql(4);",
+                  "  pm.collectionVariables.set('invitationId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizerId\": {{aliceId}},\n  \"route\": \"Riverside Park Trail\",\n  \"dateTime\": \"{{invDateTime}}\",\n  \"totalSpots\": 4\n}"
+            },
+            "url": "{{baseUrl}}/api/invitations"
+          }
+        },
+        {
+          "name": "Bob browses open walks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Alice\\'s walk is listed', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const routes = pm.response.json().map(i => i.route);",
+                  "  pm.expect(routes).to.include('Riverside Park Trail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/invitations/open?excludeUserId={{bobId}}"
+          }
+        },
+        {
+          "name": "Bob joins the walk",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('spotsLeft drops to 3', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().spotsLeft).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/invitations/{{invitationId}}/join?userId={{bobId}}"
+          }
+        },
+        {
+          "name": "Bob joins again → 400 already-joined",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 duplicate join blocked', () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().message).to.eql('already-joined');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/invitations/{{invitationId}}/join?userId={{bobId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Match flow (Bearer required)",
+      "item": [
+        {
+          "name": "No token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 without Bearer token', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/matches"
+          }
+        },
+        {
+          "name": "Alice: Buddy → Luna blind-date request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('pending outgoing match', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.status).to.eql('pending');",
+                  "  pm.expect(j.direction).to.eql('outgoing');",
+                  "  pm.expect(j.otherPet.name).to.eql('Luna');",
+                  "  pm.collectionVariables.set('matchId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterPetId\": {{buddyId}},\n  \"targetPetId\": {{lunaId}},\n  \"matchType\": \"BLIND_DATE\",\n  \"notes\": \"Would love to meet!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/matches"
+          }
+        },
+        {
+          "name": "Bob: reverse pair Luna → Buddy → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 reverse-pair duplicate blocked', () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().message).to.include('already exists');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterPetId\": {{lunaId}},\n  \"targetPetId\": {{buddyId}},\n  \"matchType\": \"BLIND_DATE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/matches"
+          }
+        },
+        {
+          "name": "Alice tries to accept her own request → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 requester cannot self-accept', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/accept"
+          }
+        },
+        {
+          "name": "Bob accepts the request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted, oriented to Bob', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.status).to.eql('accepted');",
+                  "  pm.expect(j.direction).to.eql('incoming');",
+                  "  pm.expect(j.myPet.name).to.eql('Luna');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/accept"
+          }
+        },
+        {
+          "name": "Alice lists her matches",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted match visible', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const m = pm.response.json().find(x => x.id === pm.collectionVariables.get('matchId'));",
+                  "  pm.expect(m).to.exist;",
+                  "  pm.expect(m.status).to.eql('accepted');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": "{{baseUrl}}/api/matches"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Chat (Bearer required)",
+      "item": [
+        {
+          "name": "Alice messages Bob in the match thread",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('sent, mine=true', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.mine).to.eql(true);",
+                  "  pm.expect(j.contextType).to.eql('match');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": {{bobId}},\n  \"content\": \"Saturday at the park?\",\n  \"contextType\": \"MATCH\",\n  \"contextId\": {{matchId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/messages"
+          }
+        },
+        {
+          "name": "Bob replies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('sent', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": {{aliceId}},\n  \"content\": \"Saturday works!\",\n  \"contextType\": \"MATCH\",\n  \"contextId\": {{matchId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/messages"
+          }
+        },
+        {
+          "name": "Bob reads the thread",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('both messages, oldest first, mine oriented to Bob', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.length).to.be.at.least(2);",
+                  "  pm.expect(j[0].mine).to.eql(false);",
+                  "  pm.expect(j[j.length - 1].mine).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": "{{baseUrl}}/api/messages/thread?otherUserId={{aliceId}}&contextType=match&contextId={{matchId}}"
+          }
+        },
+        {
+          "name": "Bob's conversations inbox",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('one row per partner with last message', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const row = pm.response.json().find(c => c.otherUserName === 'Alice');",
+                  "  pm.expect(row).to.exist;",
+                  "  pm.expect(row.lastMessage).to.eql('Saturday works!');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": "{{baseUrl}}/api/messages/conversations"
+          }
+        },
+        {
+          "name": "Alice's unread count ≥ 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('unread pending', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().count).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": "{{baseUrl}}/api/messages/unread-count"
+          }
+        },
+        {
+          "name": "Alice marks thread read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updated ≥ 1', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().updated).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": "{{baseUrl}}/api/messages/read?otherUserId={{bobId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Marketplace & reviews",
+      "item": [
+        {
+          "name": "Bob lists a carrier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MarketplaceItem shape', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.condition).to.eql('Good');",
+                  "  pm.expect(j.category).to.eql('Carrier');",
+                  "  pm.expect(j.sellerName).to.eql('Bob');",
+                  "  pm.collectionVariables.set('itemId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sellerId\": {{bobId}},\n  \"name\": \"Pet Carrier Bag\",\n  \"price\": 25,\n  \"originalPrice\": 60,\n  \"condition\": \"Good\",\n  \"category\": \"Carrier\"\n}"
+            },
+            "url": "{{baseUrl}}/api/marketplace/items"
+          }
+        },
+        {
+          "name": "Filter by category=Carrier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('listing found', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().map(i => i.id)).to.include(pm.collectionVariables.get('itemId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketplace/items?category=Carrier"
+          }
+        },
+        {
+          "name": "Alice asks about the item (listing-scoped chat)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('listing thread message', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().contextType).to.eql('listing');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": {{bobId}},\n  \"content\": \"Is the carrier still available?\",\n  \"contextType\": \"LISTING\",\n  \"contextId\": {{itemId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/messages"
+          }
+        },
+        {
+          "name": "Bob reviews Buddy (5 stars)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('review created', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().rating).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewerId\": {{bobId}},\n  \"petId\": {{buddyId}},\n  \"rating\": 5,\n  \"comment\": \"Buddy is so well-behaved!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/reviews"
+          }
+        },
+        {
+          "name": "Buddy's aggregate rating = 5.0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('pets.rating recomputed', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().rating).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/pets/{{buddyId}}"
+          }
+        },
+        {
+          "name": "Alice reviews her own pet → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 own-pet guard', () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().message).to.include('own pet');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewerId\": {{aliceId}},\n  \"petId\": {{buddyId}},\n  \"rating\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/reviews"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 · Notifications",
+      "item": [
+        {
+          "name": "Alice's feed (deep links)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('walk_request / match / message / review all present with deep links', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cats = pm.response.json().map(n => n.category);",
+                  "  ['walk_request', 'match', 'message', 'review'].forEach(c => pm.expect(cats, c).to.include(c));",
+                  "  pm.response.json().forEach(n => {",
+                  "    if (n.relatedType) pm.expect(n.relatedId, `relatedId for ${n.category}`).to.not.be.null;",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications?userId={{aliceId}}"
+          }
+        },
+        {
+          "name": "Alice's unread badge count",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('count ≥ 4', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().count).to.be.at.least(4);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/unread-count?userId={{aliceId}}"
+          }
+        },
+        {
+          "name": "Mark all read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updated ≥ 4', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().updated).to.be.at.least(4);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/read-all?userId={{aliceId}}"
+          }
+        },
+        {
+          "name": "Badge count back to 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('count = 0', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().count).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/unread-count?userId={{aliceId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

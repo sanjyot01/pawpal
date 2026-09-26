@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "PawPal",
+    "slug": "mobile",
+    "scheme": "pawpal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "PawPal needs your location to show nearby pets and walking partners.",
+        "NSPhotoLibraryUsageDescription": "PawPal needs access to your photo library to upload profile and pet photos.",
+        "NSCameraUsageDescription": "PawPal needs camera access to take profile and pet photos.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.pawpal.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_API_KEY"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "package": "com.pawpal.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d4acc4d5-1406-497e-a826-042be7fc9f4d"
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin",
+      "expo-image-picker",
+      "expo-location",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+# Loads every dashboard JSON mounted at /var/lib/grafana/dashboards on startup.
+apiVersion: 1
+
+providers:
+  - name: 'pawpal'
+    orgId: 1
+    folder: 'PawPal'
+    type: file
+    disableDeletion: false
+    # Dashboards are files in git, not Grafana's database: edits made in the UI are
+    # overwritten on restart on purpose, so what you see matches what is committed.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

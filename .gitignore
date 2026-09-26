@@ -1,0 +1,11 @@
+# --- Global OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Global IDE Files ---
+.idea/
+.vscode/
+
+# --- Global Environment ---
+.env
+

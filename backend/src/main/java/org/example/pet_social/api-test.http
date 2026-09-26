@@ -1,0 +1,37 @@
+### Health check
+GET http://localhost:8080/api/system/health
+
+
+### Register a new user
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "role": "PET_OWNER",
+  "isActive": true,
+  "matchPreferencesMask": 5
+}
+
+
+### Send user location telemetry
+POST http://localhost:8080/api/telemetry/location
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "latitude": 40.7128,
+  "longitude": -74.0060
+}
+
+
+### Match a user for a walking partner / meetup
+POST http://localhost:8080/api/match
+Content-Type: application/json
+
+{
+  "searchLatitude": 40.7128,
+  "searchLongitude": -74.0060,
+  "preferencesMask": 5
+}

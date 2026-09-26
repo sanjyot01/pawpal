@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Social Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            color: white;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .control-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button.secondary {
+            background: #f59e0b;
+        }
+
+        button.secondary:hover {
+            background: #d97706;
+        }
+
+        button.danger {
+            background: #ef4444;
+        }
+
+        button.danger:hover {
+            background: #dc2626;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-card.users {
+            border-left-color: #10b981;
+        }
+
+        .metric-card.telemetry {
+            border-left-color: #3b82f6;
+        }
+
+        .metric-card.matching {
+            border-left-color: #f59e0b;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .metric-subvalue {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.running {
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .status-bar {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .status-text {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .status-time {
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        .log-box {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .log-item {
+            margin-bottom: 5px;
+        }
+
+        .log-time {
+            color: #888;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Pet Social Dashboard</h1>
+            <p>Real-time Data Ingestion & Processing System</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>Users:</label>
+                <input type="number" id="userCount" value="100" min="1">
+                <button onclick="generateUsers()">Generate</button>
+            </div>
+            <div class="control-group">
+                <label>Telemetry:</label>
+                <input type="number" id="telemetryCount" value="1000" min="1">
+                <button onclick="generateTelemetry()">Generate</button>
+            </div>
+            <div class="control-group">
+                <label>Stream:</label>
+                <input type="number" id="streamRps" value="100" min="1" placeholder="rec/sec">
+                <input type="number" id="streamDuration" value="30" min="1" placeholder="seconds">
+                <button class="secondary" onclick="startStream()">Start Stream</button>
+            </div>
+            <button class="danger" onclick="resetMetrics()">Reset All</button>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card users">
+                <div class="metric-label">Total Users</div>
+                <div class="metric-value" id="totalUsers">-</div>
+                <div class="metric-subvalue">Available: <span id="availableUsers">-</span> | Geo: <span id="geoUsers">-</span></div>
+            </div>
+
+            <div class="metric-card telemetry">
+                <div class="metric-label">Telemetry Processed</div>
+                <div class="metric-value" id="telemetryProcessed">-</div>
+                <div class="metric-subvalue">Data Points Ingested</div>
+            </div>
+
+            <div class="metric-card matching">
+                <div class="metric-label">Matching Results</div>
+                <div class="metric-value" id="successMatches">-</div>
+                <div class="metric-subvalue">Success Rate: <span id="successRate">-</span></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">System Status</div>
+                <div style="margin-top: 15px;">
+                    <div><span class="status-indicator running"></span><strong>LIVE</strong></div>
+                    <div class="metric-subvalue" style="margin-top: 10px;">Last Update: <span id="lastUpdate">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">📊 Data Distribution</div>
+                <canvas id="distributionChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">✅ Match Success Rate</div>
+                <canvas id="successRateChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">🌍 User Status</div>
+                <canvas id="userStatusChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📈 Telemetry Trend</div>
+                <canvas id="telemetryTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="status-bar">
+            <div class="status-text">
+                <span class="status-indicator running"></span>
+                <strong>System Running</strong> - Ingesting and processing real-time data
+            </div>
+            <div class="status-time">Last Updated: <span id="updateTime">-</span></div>
+        </div>
+
+        <!-- Logs -->
+        <div style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div class="chart-title">📋 Activity Log</div>
+            <div class="log-box" id="logBox"></div>
+        </div>
+    </div>
+
+    <script>
+        let distributionChart, successRateChart, userStatusChart, telemetryTrendChart;
+        let telemetryHistory = [];
+        const MAX_HISTORY = 20;
+
+        // Initialize charts
+        function initCharts() {
+            // Distribution Chart
+            const distCtx = document.getElementById('distributionChart').getContext('2d');
+            distributionChart = new Chart(distCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Users', 'Telemetry', 'Matches'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Success Rate Chart
+            const successCtx = document.getElementById('successRateChart').getContext('2d');
+            successRateChart = new Chart(successCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Successful', 'Failed'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['#10b981', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // User Status Chart
+            const userCtx = document.getElementById('userStatusChart').getContext('2d');
+            userStatusChart = new Chart(userCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Total', 'Available', 'In Geo Index'],
+                    datasets: [{
+                        label: 'Users',
+                        data: [0, 0, 0],
+                        backgroundColor: '#667eea'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Telemetry Trend Chart
+            const trendCtx = document.getElementById('telemetryTrendChart').getContext('2d');
+            telemetryTrendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: Array(MAX_HISTORY).fill(''),
+                    datasets: [{
+                        label: 'Telemetry Records',
+                        data: Array(MAX_HISTORY).fill(0),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update metrics
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/dashboard/api/metrics');
+                const data = await response.json();
+
+                // Update metric cards
+                document.getElementById('totalUsers').textContent = data.users.total;
+                document.getElementById('availableUsers').textContent = data.users.available;
+                document.getElementById('geoUsers').textContent = data.users.inGeoIndex;
+                document.getElementById('telemetryProcessed').textContent = data.telemetry.totalProcessed;
+                document.getElementById('successMatches').textContent = data.matching.successfulMatches;
+                document.getElementById('successRate').textContent = data.matching.successRate;
+                document.getElementById('lastUpdate').textContent = new Date(data.summary.timestamp).toLocaleTimeString();
+
+                // Update charts
+                updateCharts(data);
+
+                // Add to history
+                telemetryHistory.push(data.telemetry.totalProcessed);
+                if (telemetryHistory.length > MAX_HISTORY) {
+                    telemetryHistory.shift();
+                }
+
+                addLog(`✅ Metrics updated - Users: ${data.users.total}, Telemetry: ${data.telemetry.totalProcessed}`);
+            } catch (error) {
+                addLog(`❌ Error updating metrics: ${error.message}`);
+            }
+        }
+
+        function updateCharts(data) {
+            // Distribution Chart
+            const totalDataPoints = data.users.total + data.telemetry.totalProcessed + (data.matching.successfulMatches + data.matching.failedMatches);
+            distributionChart.data.datasets[0].data = [
+                data.users.total,
+                data.telemetry.totalProcessed,
+                data.matching.successfulMatches + data.matching.failedMatches
+            ];
+            distributionChart.update();
+
+            // Success Rate Chart
+            successRateChart.data.datasets[0].data = [
+                data.matching.successfulMatches,
+                data.matching.failedMatches
+            ];
+            successRateChart.update();
+
+            // User Status Chart
+            userStatusChart.data.datasets[0].data = [
+                data.users.total,
+                data.users.available,
+                data.users.inGeoIndex
+            ];
+            userStatusChart.update();
+
+            // Telemetry Trend Chart
+            telemetryTrendChart.data.labels = telemetryHistory.map((_, i) => `${i - telemetryHistory.length + 1}s`);
+            telemetryTrendChart.data.datasets[0].data = telemetryHistory;
+            telemetryTrendChart.update();
+        }
+
+        // API calls
+        async function generateUsers() {
+            const count = document.getElementById('userCount').value;
+            addLog(`⏳ Generating ${count} users...`);
+            try {
+                const response = await fetch(`/api/test-data/users?count=${count}`, { method: 'POST' });
+                const data = await response.json();
+                addLog(`✅ ${data.status}`);
+                setTimeout(updateMetrics, 2000);
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function generateTelemetry() {
+            const count = document.getElementById('telemetryCount').value;
+            const maxUserId = Math.max(100, parseInt(document.getElementById('userCount').value) || 100);
+            addLog(`⏳ Generating ${count} telemetry records...`);
+            try {
+                const response = await fetch(`/api/test-data/telemetry?count=${count}&maxUserId=${maxUserId}`, { method: 'POST' });
+                const data = await response.json();
+                addLog(`✅ ${data.status}`);
+                setTimeout(updateMetrics, 2000);
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function startStream() {
+            const users = Math.max(10, parseInt(document.getElementById('userCount').value) || 100);
+            const rps = document.getElementById('streamRps').value;
+            const duration = document.getElementById('streamDuration').value;
+            addLog(`⏳ Starting continuous stream: ${users} users, ${rps} rec/sec, ${duration}s...`);
+            try {
+                const response = await fetch(`/api/test-data/stream?users=${users}&rps=${rps}&duration=${duration}`, { method: 'POST' });
+                const data = await response.json();
+                addLog(`✅ ${data.status}`);
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function resetMetrics() {
+            if (confirm('Reset all metrics? This will clear all counters.')) {
+                addLog(`⏳ Resetting metrics...`);
+                try {
+                    const response = await fetch('/dashboard/api/reset', { method: 'POST' });
+                    const data = await response.json();
+                    addLog(`✅ ${data.status}`);
+                    setTimeout(updateMetrics, 500);
+                } catch (error) {
+                    addLog(`❌ Error: ${error.message}`);
+                }
+            }
+        }
+
+        function addLog(message) {
+            const logBox = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            logBox.appendChild(logItem);
+            logBox.scrollTop = logBox.scrollHeight;
+
+            // Keep only last 50 items
+            while (logBox.children.length > 50) {
+                logBox.removeChild(logBox.firstChild);
+            }
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            addLog('🚀 Dashboard initialized');
+            updateMetrics();
+            // Auto-update every 2 seconds
+            setInterval(updateMetrics, 2000);
+        });
+    </script>
+</body>
+</html>
+

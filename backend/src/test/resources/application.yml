@@ -1,0 +1,23 @@
+# Test overrides: run the full Spring context without Docker.
+# H2 (PostgreSQL compatibility mode) replaces Postgres; Kafka listeners don't
+# auto-start (no broker in CI); Redis calls are lazy so no server is needed
+# until a cache path is actually exercised.
+spring:
+  datasource:
+    url: jdbc:h2:mem:pet_social_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  # Flyway migrations are PostgreSQL DDL and are verified against Postgres, not H2.
+  # Tests build their schema from the entities instead, which is also what makes a
+  # drift between entities and migrations visible: the app boots with ddl-auto:validate
+  # against a Flyway-built database, so a missing migration fails at startup.
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  kafka:
+    listener:
+      auto-startup: false

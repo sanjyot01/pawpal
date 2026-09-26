@@ -1,0 +1,200 @@
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      # Keep request threads within reach of the Hikari pool (20 connections). Tomcat's
+      # default of 200 lets 180 threads queue on the pool under DB-heavy load and fail
+      # as cascading 500s after the 30s connection timeout. Re-tune with the pool size
+      # against the Sprint 4 load test.
+      max: ${SERVER_TOMCAT_MAX_THREADS:50}
+  compression:
+    # Feed responses are verbose denormalized JSON read over mobile networks.
+    enabled: true
+    mime-types: application/json
+    min-response-size: 1024
+
+management:
+  endpoints:
+    web:
+      # Only health/info are public. Prometheus/metrics expose internal timing and
+      # topology; enable them behind an override (env MGMT_ENDPOINTS) in trusted envs only.
+      exposure:
+        include: ${MGMT_ENDPOINTS:health,info}
+  endpoint:
+    prometheus:
+      enabled: ${MGMT_PROMETHEUS_ENABLED:false}
+
+app:
+  # The wall clock invitation date/time strings are written in. The phone formats them in its
+  # own zone and the backend stores that naive local time, so "has this booking passed?" must be
+  # asked in the same zone — not the container's, which is UTC. Left at the server default this
+  # made an evening booking in Toronto expire the moment it was posted. Set to the timezone your
+  # users are actually in; a multi-timezone deployment needs real instants instead (see below).
+  timezone: ${APP_TIMEZONE:America/Toronto}
+  # HMAC secret for signing app JWTs. MUST be overridden via APP_JWT_SECRET in every
+  # non-local environment — the app refuses to start with the built-in dev value unless
+  # spring.profiles.active includes "dev" (see JwtService).
+  jwt:
+    secret: ${APP_JWT_SECRET:pawpal-dev-secret-change-in-production}
+    ttl-hours: ${APP_JWT_TTL_HOURS:168}
+  cors:
+    # Comma-separated allowed origins. Defaults to local Expo/emulator dev hosts; set
+    # APP_CORS_ALLOWED_ORIGINS to your web/app origin(s) in production.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:8081,http://localhost:19006,http://10.0.2.2:8081}
+  auth:
+    google:
+      # OAuth client id for POST /api/auth/google audience verification. Empty = accept
+      # any Google-issued ID token (dev only); set GOOGLE_CLIENT_ID before production.
+      client-id: ${GOOGLE_CLIENT_ID:}
+  kafka:
+    # Partition count for user-telemetry, declared by KafkaTopicConfig and reused as the
+    # telemetry listener's concurrency (1 consumer thread per partition is the ceiling).
+    telemetry-partitions: ${APP_KAFKA_TELEMETRY_PARTITIONS:3}
+  # Unauthenticated load-generation/introspection endpoints (/api/test-data/*,
+  # /api/inspector/*). On by default for local dev and load tests; MUST be disabled
+  # (APP_TEST_ENDPOINTS_ENABLED=false) in any internet-reachable deployment.
+  test-endpoints:
+    enabled: ${APP_TEST_ENDPOINTS_ENABLED:true}
+  matching:
+    # Require a live users:presence:* key (refreshed by telemetry, expires when pings
+    # stop) before offering someone as a walking partner. Set false for demos that seed
+    # users without streaming telemetry for them.
+    require-fresh-presence: ${APP_MATCHING_REQUIRE_FRESH_PRESENCE:true}
+    # Re-seed users:meta:* from Postgres on startup. Accounts that predate the
+    # meta/presence split lost their active+preferences to the old shared 6h TTL and
+    # would otherwise never appear as match candidates again.
+    backfill-meta-on-startup: ${APP_MATCHING_BACKFILL_META:true}
+  demo-seed:
+    # POST /api/demo/seed fills an empty deployment with owners, pets, posts, events,
+    # listings and live Redis presence (see DemoSeedService). Off unless asked for — it
+    # writes user accounts, so it defaults the opposite way to the load-test endpoints.
+    # Still requires a Bearer token: the controller sits under /api/ behind JwtAuthFilter.
+    enabled: ${APP_DEMO_SEED_ENABLED:false}
+    # Shared by every seeded account, so a presenter can sign in as any of them.
+    password: ${APP_DEMO_SEED_PASSWORD:pawpal-demo}
+  discovery:
+    # Radius bounds for /api/pets/{nearby,partners,blind-dates}. The partner and blind-date
+    # feeds previously had no bound at all: they read every playdate-available pet in the
+    # database and only used distance to render the label, so a "nearby walk" card could be
+    # thousands of km away. Radius is now a real filter, clamped server-side because the
+    # client supplies it.
+    default-radius-km: ${APP_DISCOVERY_DEFAULT_RADIUS_KM:25}
+    max-radius-km: ${APP_DISCOVERY_MAX_RADIUS_KM:100}
+    # Also the GEOSEARCH COUNT, so one request can't walk the whole geo index.
+    max-results: ${APP_DISCOVERY_MAX_RESULTS:100}
+  ratelimit:
+    # X-Forwarded-For is attacker-controlled unless a proxy overwrites it, so the limiter
+    # uses the socket address by default. Turn this on only behind an ALB/nginx that
+    # rewrites the header — otherwise a forged header buys an attacker a fresh budget.
+    trust-forwarded-for: ${APP_RATELIMIT_TRUST_FORWARDED_FOR:false}
+    login:
+      # Throttles /api/auth/{login,register,google} and the /api/users/* aliases. Each of
+      # those costs ~100ms of BCrypt or an outbound token verification, so unthrottled they
+      # let a few connections saturate every request thread on the box.
+      enabled: ${APP_RATELIMIT_LOGIN_ENABLED:true}
+      # Per source address, counting every attempt. Generous enough for a shared NAT/office
+      # egress IP and a demo audience signing in at once, tight enough to cap the CPU burn.
+      ip-attempts: ${APP_RATELIMIT_LOGIN_IP_ATTEMPTS:20}
+      ip-window-seconds: ${APP_RATELIMIT_LOGIN_IP_WINDOW_SECONDS:60}
+      # Per account, counting only failures and reset by a successful login. Kept to a short
+      # window on purpose: a long lockout would let anyone who knows your email lock you out.
+      account-failures: ${APP_RATELIMIT_LOGIN_ACCOUNT_FAILURES:10}
+      account-window-seconds: ${APP_RATELIMIT_LOGIN_ACCOUNT_WINDOW_SECONDS:900}
+  push:
+    # Android/iOS delivery via Expo (which fronts FCM). Sending happens on the Kafka
+    # consumer thread, never a request thread. A user with no registered device is a
+    # no-op, so this is safe to leave on in dev.
+    enabled: ${APP_PUSH_ENABLED:true}
+    expo-url: ${APP_PUSH_EXPO_URL:https://exp.host/--/api/v2/push/send}
+    # Only needed once the Expo project turns on enhanced push security.
+    access-token: ${APP_PUSH_ACCESS_TOKEN:}
+    connect-timeout-ms: ${APP_PUSH_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${APP_PUSH_READ_TIMEOUT_MS:10000}
+
+spring:
+  application:
+    name: pet_social
+
+  # PostgreSQL Configuration — credentials come from the environment; the defaults are
+  # for local dev only. Set DB_URL / DB_USERNAME / DB_PASSWORD in every real deployment.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pet_social_db}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:rootpassword}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20 # starting point; tune against the Sprint 4 load test
+      minimum-idle: 5
+
+  # Schema is owned by Flyway (src/main/resources/db/migration), not Hibernate.
+  # ddl-auto: update silently failed to add NOT NULL columns to populated tables and
+  # left the app running against a stale schema for days; migrations fail loudly instead.
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    # Databases created by the old ddl-auto have tables but no flyway_schema_history.
+    # Baselining at V1 marks the pre-Flyway schema as already present, so V1 is skipped
+    # there while V2 onward still apply. A fresh database runs everything from V1.
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  jpa:
+    hibernate:
+      # validate, never update: Hibernate checks the entities match what Flyway built
+      # and refuses to start on drift, rather than silently mutating the schema.
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    # Console SQL logging is synchronous and measurably caps throughput under load.
+    # Off by default; set SHOW_SQL=true when debugging queries locally.
+    show-sql: ${SHOW_SQL:false}
+    # Don't hold a DB connection for the whole request (Redis calls + JSON serialization
+    # included) — services fetch-join what they need up front.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: ${SHOW_SQL:false}
+        jdbc:
+          batch_size: 50 # requires SEQUENCE-based ids (set on all entities) - IDENTITY disables batching
+        order_inserts: true
+        order_updates: true
+
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      lettuce:
+        pool:
+          # Must exceed the Kafka listener concurrency (8) so each consumer thread can hold
+          # its own connection during executePipelined() instead of serializing on a shared one.
+          max-active: 16
+          max-idle: 16
+          min-idle: 4
+          max-wait: 1000ms
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Producers already serialize payloads to JSON strings themselves (ObjectMapper);
+      # JsonSerializer was re-serializing that string (quote+escape every byte). Plain
+      # StringSerializer removes the double serialization on both topics.
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Small batching window + compression: ~free throughput for telemetry bursts.
+      properties:
+        linger.ms: 5
+        batch.size: 32768
+        compression.type: lz4
+    listener:
+      # Single @KafkaListener in the app (TelemetryConsumerService) is written for batch mode -
+      # with the user-telemetry topic at 1 partition, batching is how we maximize throughput
+      # on a single partition before scaling out partitions/brokers.
+      type: batch
+    consumer:
+      group-id: dispatch-group
+      auto-offset-reset: earliest
+      max-poll-records: 1000
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Consumers parse JSON themselves (ObjectMapper.readValue) — mirror of the producer
+      # change above; also removes the trusted.packages="*" deserialization smell.
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer

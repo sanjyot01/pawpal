@@ -1,0 +1,21 @@
+# Prometheus config for the single-instance deployment (docker-compose.aws.yml).
+#
+# Separate from monitoring/prometheus.yml because the app runs in a different place in
+# each setup: locally it runs on the host via mvnw (host.docker.internal), here it is a
+# compose service and reachable by its service name on the compose network.
+global:
+  scrape_interval: 15s
+  external_labels:
+    deployment: single-instance
+
+scrape_configs:
+  - job_name: 'pawpal-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      # Compose service name, not the published port: this scrape never leaves the
+      # container network, so the metrics endpoint stays off the public interface.
+      - targets: ['app:8080']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

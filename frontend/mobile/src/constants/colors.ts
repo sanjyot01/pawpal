@@ -1,0 +1,16 @@
+export const COLORS = {
+  primary: '#F97316',
+  primaryLight: '#FFF7ED',
+  primaryBorder: '#FED7AA',
+  purple: '#8B5CF6',
+  purpleLight: '#F5F3FF',
+  green: '#22C55E',
+  red: '#EF4444',
+  bg: '#FAF9F6',
+  card: '#FFFFFF',
+  text: '#1A1230',
+  textSub: '#7C6B9A',
+  textMuted: '#A89EC0',
+  border: '#E9E5F0',
+  shadow: 'rgba(0,0,0,0.06)',
+};
